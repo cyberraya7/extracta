@@ -4,19 +4,38 @@ import { ENTITY_COLORS } from '../types';
 
 interface LinkedEntitiesPanelProps {
   linkedEntities: LinkedEntity[];
+  /** Count from API before sidebar filters; used for empty-state hints. */
+  totalLinkedBeforeFilter: number;
   onSelectEntity: (entityId: string) => void;
+  /** Documents in the current run; used to explain empty state (linked = 2+ docs). */
+  documentCount: number;
+}
+
+function emptyStateMessage(
+  documentCount: number,
+  totalLinkedBeforeFilter: number,
+): string {
+  if (documentCount < 2) {
+    return 'Linked shows entities that appear in at least two documents in this session. Add another file and run process again to see names, emails, and other hits shared across files.';
+  }
+  if (totalLinkedBeforeFilter > 0) {
+    return 'No linked entities match the sidebar filters. Try clearing some entity types, search text, or lowering the confidence threshold.';
+  }
+  return 'No cross-document matches yet. The same normalized entity (e.g. identical person or email) must occur in two or more of your uploaded files.';
 }
 
 export function LinkedEntitiesPanel({
   linkedEntities,
+  totalLinkedBeforeFilter,
   onSelectEntity,
+  documentCount,
 }: LinkedEntitiesPanelProps) {
   if (linkedEntities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500">
         <Link2 className="w-12 h-12" />
-        <p className="text-sm text-center px-4">
-          No linked entities found. Upload multiple documents to see entities shared across them.
+        <p className="text-sm text-center px-4 max-w-md leading-relaxed">
+          {emptyStateMessage(documentCount, totalLinkedBeforeFilter)}
         </p>
       </div>
     );
@@ -27,7 +46,11 @@ export function LinkedEntitiesPanel({
       <div className="px-4 py-3 border-b border-slate-800 shrink-0 flex items-center gap-2">
         <Link2 className="w-4 h-4 text-blue-400" />
         <h3 className="font-semibold text-sm text-slate-300">
-          Cross-Document Entities ({linkedEntities.length})
+          Cross-Document Entities ({linkedEntities.length}
+          {totalLinkedBeforeFilter > linkedEntities.length
+            ? ` of ${totalLinkedBeforeFilter}`
+            : ''}
+          )
         </h3>
       </div>
       <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">

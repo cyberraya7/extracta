@@ -3,6 +3,7 @@ import type {
   UploadResult,
   ProcessRequest,
   ProcessResponse,
+  ProcessStatus,
   Entity,
   GraphData,
   EvidenceResult,
@@ -13,7 +14,7 @@ import type {
 
 const client = axios.create({
   baseURL: '/api',
-  timeout: 300_000,
+  timeout: 120_000,
 });
 
 export async function uploadFiles(files: File[]): Promise<UploadResult[]> {
@@ -23,10 +24,34 @@ export async function uploadFiles(files: File[]): Promise<UploadResult[]> {
   return data;
 }
 
+const BATCH_SIZE = 10;
+
+export async function uploadFilesBatched(
+  files: File[],
+  onProgress?: (uploaded: number, total: number) => void,
+): Promise<UploadResult[]> {
+  const allResults: UploadResult[] = [];
+  const total = files.length;
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    const results = await uploadFiles(batch);
+    allResults.push(...results);
+    onProgress?.(Math.min(i + batch.length, total), total);
+  }
+
+  return allResults;
+}
+
 export async function processDocuments(
   req: ProcessRequest
 ): Promise<ProcessResponse> {
   const { data } = await client.post<ProcessResponse>('/process', req);
+  return data;
+}
+
+export async function getProcessStatus(sessionId: string): Promise<ProcessStatus> {
+  const { data } = await client.get<ProcessStatus>(`/process/status/${sessionId}`);
   return data;
 }
 

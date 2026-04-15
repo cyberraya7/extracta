@@ -35,6 +35,16 @@ class MemoryStore:
     def __init__(self) -> None:
         self.processed: bool = False
         self.current_session_id: str | None = None
+        self._task_progress: dict[str, dict] = {}
+
+    def set_task_progress(self, session_id: str, progress: dict) -> None:
+        self._task_progress[session_id] = progress
+
+    def get_task_progress(self, session_id: str) -> dict | None:
+        return self._task_progress.get(session_id)
+
+    def clear_task_progress(self, session_id: str) -> None:
+        self._task_progress.pop(session_id, None)
 
     def _session(self) -> Session:
         return SessionLocal()
@@ -217,6 +227,8 @@ class MemoryStore:
     # ── Entities (session-scoped) ──
 
     def set_entities(self, entities: list[dict], document_ids: list[str] | None = None) -> None:
+        """Store entity records. Per-document occurrences are handled separately
+        by _record_per_doc_occurrences to avoid incorrect cross-product linking."""
         sid = self.current_session_id
         with self._session() as s:
             for ent in entities:
@@ -230,18 +242,6 @@ class MemoryStore:
                     variants=ent.get("variants", []),
                 )
                 s.add(db_ent)
-
-                doc_ids = document_ids or []
-                for pos in ent.get("positions", []):
-                    for did in doc_ids:
-                        s.add(EntityOccurrenceModel(
-                            entity_id=ent["id"],
-                            document_id=did,
-                            session_id=sid,
-                            start_pos=pos["start"],
-                            end_pos=pos["end"],
-                            raw_text=ent["text"],
-                        ))
             s.commit()
 
     def set_entity_occurrences(

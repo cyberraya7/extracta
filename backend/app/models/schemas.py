@@ -78,6 +78,17 @@ class ProcessResponse(BaseModel):
     session_id: str | None = None
 
 
+class ProcessStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    progress: int = 0
+    total: int = 0
+    current_file: str = ""
+    entity_count: int = 0
+    edge_count: int = 0
+    error: str | None = None
+
+
 class SessionOut(BaseModel):
     id: str
     name: str

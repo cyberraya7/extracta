@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from dataclasses import replace
 from difflib import SequenceMatcher
 
 from dateutil import parser as date_parser
@@ -15,6 +16,49 @@ _CURRENCY_RE = re.compile(
 )
 
 
+def _digit_run_length(text: str) -> int:
+    return len(re.sub(r"\D", "", text))
+
+
+def _looks_like_phone_text(text: str) -> bool:
+    """Heuristic: enough digits to be a phone, without requiring @."""
+    return _digit_run_length(text) >= 7
+
+
+def _sanitize_entity_label(ent: ExtractedEntity) -> ExtractedEntity:
+    """GLiNER often mislabels bare phone strings as *email*; fix before grouping."""
+    if ent.label.lower() != "email":
+        return ent
+    if "@" in ent.text:
+        return ent
+    if _looks_like_phone_text(ent.text):
+        return replace(ent, label="phone")
+    return ent
+
+
+def _resolve_label_merge(text: str, label_a: str, label_b: str) -> str:
+    """Pick one label when two sources disagree on the same surface string."""
+    a, b = label_a.lower(), label_b.lower()
+    if a == b:
+        return label_a
+
+    pair = {a, b}
+    if "email" in pair and "phone" in pair:
+        if "@" in text:
+            return label_a if a == "email" else label_b
+        if _looks_like_phone_text(text):
+            return label_a if a == "phone" else label_b
+        return label_a if a == "email" else label_b
+
+    if "email" in pair and "ic number" in pair:
+        if "@" in text:
+            return label_a if a == "email" else label_b
+        if _digit_run_length(text) >= 10 and "-" in text.replace(" ", ""):
+            return label_a if a == "ic number" else label_b
+
+    return label_a
+
+
 def normalize_entities(entities: list[ExtractedEntity]) -> list[dict]:
     """Normalize and deduplicate a list of extracted entities.
 
@@ -24,10 +68,15 @@ def normalize_entities(entities: list[ExtractedEntity]) -> list[dict]:
     groups: dict[str, dict] = {}
 
     for ent in entities:
+        ent = _sanitize_entity_label(ent)
         canonical = _find_canonical(ent, groups)
 
         if canonical:
             group = groups[canonical]
+            if group["label"].lower() != ent.label.lower():
+                group["label"] = _resolve_label_merge(
+                    ent.text, group["label"], ent.label
+                )
             group["occurrences"] += 1
             group["score"] = max(group["score"], ent.score)
             if ent.text not in group["variants"]:

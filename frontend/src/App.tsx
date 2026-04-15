@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { UploadPanel } from './components/UploadPanel';
 import { ProcessingStatus } from './components/ProcessingStatus';
@@ -11,8 +11,9 @@ import { LinkedEntitiesPanel } from './components/LinkedEntitiesPanel';
 import { DocumentList } from './components/DocumentList';
 import { TableProperties, GitGraph, Link2 } from 'lucide-react';
 import {
-  uploadFiles,
+  uploadFilesBatched,
   processDocuments,
+  getProcessStatus,
   getEntities,
   getGraph,
   getEntityEvidence,
@@ -29,8 +30,15 @@ import type {
   LinkedEntity,
 } from './types';
 
-type AppStage = 'upload' | 'processing' | 'results';
+type AppStage = 'upload' | 'uploading' | 'processing' | 'results';
 type ResultsTab = 'dashboard' | 'graph' | 'linked';
+
+interface ProgressInfo {
+  stage: 'uploading' | 'processing' | 'finalizing';
+  progress: number;
+  total: number;
+  currentFile: string;
+}
 
 export default function App() {
   const [stage, setStage] = useState<AppStage>('upload');
@@ -45,14 +53,26 @@ export default function App() {
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  /** Empty = all entity types; otherwise show only these labels (multi-select). */
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [labels, setLabels] = useState<string[]>([
     'person', 'organization', 'location', 'date', 'money', 'communication platform',
     'email', 'phone', 'ic number',
   ]);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
 
   const fetchLinked = useCallback(async () => {
     try {
@@ -74,11 +94,46 @@ export default function App() {
     setSelectedEntityId(null);
     setSelectedEdge(null);
     setProcessingError(null);
+    setProgressInfo(null);
   }, []);
+
+  const pollUntilDone = useCallback((sessionId: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const status = await getProcessStatus(sessionId);
+
+          if (status.status === 'completed') {
+            stopPolling();
+            setProgressInfo(null);
+            resolve();
+          } else if (status.status === 'error') {
+            stopPolling();
+            setProgressInfo(null);
+            reject(new Error(status.error || 'Processing failed'));
+          } else {
+            setProgressInfo({
+              stage: status.status === 'finalizing' ? 'finalizing' : 'processing',
+              progress: status.progress,
+              total: status.total,
+              currentFile: status.current_file,
+            });
+          }
+        } catch {
+          stopPolling();
+          reject(new Error('Lost connection to server'));
+        }
+      };
+
+      poll();
+      pollingRef.current = setInterval(poll, 2000);
+    });
+  }, [stopPolling]);
 
   const runProcessing = useCallback(async (docIds: string[]) => {
     setStage('processing');
     clearViewState();
+    setProgressInfo({ stage: 'processing', progress: 0, total: docIds.length, currentFile: 'Starting...' });
 
     try {
       const result = await processDocuments({
@@ -87,43 +142,62 @@ export default function App() {
         confidence_threshold: confidenceThreshold,
       });
 
-      if (result.session_id) {
-        setCurrentSessionId(result.session_id);
-      }
+      const sessionId = result.session_id!;
+      setCurrentSessionId(sessionId);
 
-      const [ents, graph] = await Promise.all([getEntities(), getGraph()]);
+      await pollUntilDone(sessionId);
+
+      const [ents, graph, linked] = await Promise.all([
+        getEntities(),
+        getGraph(),
+        getLinkedEntities(),
+      ]);
       setEntities(ents);
       setGraphData(graph);
-      setLinkedEntities([]);
+      setLinkedEntities(linked);
       setStage('results');
       setHistoryRefreshKey((k) => k + 1);
     } catch (err: any) {
-      setProcessingError(err?.response?.data?.detail || err.message || 'Processing failed');
+      setProcessingError(err?.message || 'Processing failed');
       setStage('results');
     }
-  }, [labels, confidenceThreshold, clearViewState]);
+  }, [labels, confidenceThreshold, clearViewState, pollUntilDone]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     try {
-      const results = await uploadFiles(files);
+      setStage('uploading');
+      setProgressInfo({ stage: 'uploading', progress: 0, total: files.length, currentFile: '' });
+
+      const results = await uploadFilesBatched(files, (uploaded, total) => {
+        setProgressInfo({ stage: 'uploading', progress: uploaded, total, currentFile: '' });
+      });
+
       const allDocs = [...documents, ...results];
       setDocuments(allDocs);
       await runProcessing(allDocs.map((d) => d.document_id));
       setActiveTab('dashboard');
     } catch (err: any) {
       setProcessingError(err?.response?.data?.detail || err.message || 'Upload failed');
-      if (stage === 'upload') setStage('results');
+      if (documents.length === 0) setStage('upload');
+      else setStage('results');
     }
-  }, [documents, runProcessing, stage]);
+  }, [documents, runProcessing]);
 
   const handleAddFiles = useCallback(async (files: File[]) => {
     try {
-      const results = await uploadFiles(files);
+      setStage('uploading');
+      setProgressInfo({ stage: 'uploading', progress: 0, total: files.length, currentFile: '' });
+
+      const results = await uploadFilesBatched(files, (uploaded, total) => {
+        setProgressInfo({ stage: 'uploading', progress: uploaded, total, currentFile: '' });
+      });
+
       const allDocs = [...documents, ...results];
       setDocuments(allDocs);
       await runProcessing(allDocs.map((d) => d.document_id));
     } catch (err: any) {
       setProcessingError(err?.response?.data?.detail || err.message || 'Upload failed');
+      setStage('results');
     }
   }, [documents, runProcessing]);
 
@@ -158,10 +232,14 @@ export default function App() {
       setCurrentSessionId(sessionId);
       setDocuments(detail.documents || []);
 
-      const [ents, graph] = await Promise.all([getEntities(), getGraph()]);
+      const [ents, graph, linked] = await Promise.all([
+        getEntities(),
+        getGraph(),
+        getLinkedEntities(),
+      ]);
       setEntities(ents);
       setGraphData(graph);
-      setLinkedEntities([]);
+      setLinkedEntities(linked);
       clearViewState();
       setStage('results');
       setActiveTab('dashboard');
@@ -204,6 +282,7 @@ export default function App() {
   }, [documents, runProcessing]);
 
   const handleReset = useCallback(() => {
+    stopPolling();
     setStage('upload');
     setActiveTab('dashboard');
     setDocuments([]);
@@ -215,17 +294,31 @@ export default function App() {
     setSelectedEdge(null);
     setProcessingError(null);
     setCurrentSessionId(null);
-  }, []);
+    setProgressInfo(null);
+    setTypeFilters([]);
+    setSearchQuery('');
+  }, [stopPolling]);
 
   const filteredEntities = entities.filter((e) => {
-    if (typeFilter && e.label !== typeFilter) return false;
+    if (typeFilters.length > 0 && !typeFilters.includes(e.label)) return false;
     if (e.score < confidenceThreshold) return false;
     if (searchQuery && !e.text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
+  const filteredLinkedEntities = useMemo(
+    () =>
+      linkedEntities.filter((e) => {
+        if (typeFilters.length > 0 && !typeFilters.includes(e.label)) return false;
+        if (e.score < confidenceThreshold) return false;
+        if (searchQuery && !e.text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        return true;
+      }),
+    [linkedEntities, typeFilters, confidenceThreshold, searchQuery],
+  );
+
   const showEvidence = selectedEntityId !== null || selectedEdge !== null;
-  const isProcessing = stage === 'processing';
+  const isProcessing = stage === 'processing' || stage === 'uploading';
 
   const tabs: { id: ResultsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <TableProperties className="w-4 h-4" /> },
@@ -241,8 +334,8 @@ export default function App() {
           onLabelsChange={setLabels}
           confidenceThreshold={confidenceThreshold}
           onConfidenceChange={setConfidenceThreshold}
-          typeFilter={typeFilter}
-          onTypeFilterChange={setTypeFilter}
+          typeFilters={typeFilters}
+          onTypeFiltersChange={setTypeFilters}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           hasResults={stage === 'results' && entities.length > 0}
@@ -265,7 +358,14 @@ export default function App() {
       }
     >
       {stage === 'upload' && <UploadPanel onUpload={handleUpload} />}
-      {stage === 'processing' && <ProcessingStatus />}
+      {(stage === 'uploading' || stage === 'processing') && (
+        <ProcessingStatus
+          stage={progressInfo?.stage ?? 'processing'}
+          progress={progressInfo?.progress ?? 0}
+          total={progressInfo?.total ?? 0}
+          currentFile={progressInfo?.currentFile ?? ''}
+        />
+      )}
       {stage === 'results' && (
         <div className="flex flex-col h-full gap-4">
           {processingError && (
@@ -325,6 +425,9 @@ export default function App() {
                 selectedNodeId={selectedEntityId}
                 onSelectNode={handleSelectEntity}
                 onSelectEdge={handleSelectEdge}
+                typeFilters={typeFilters}
+                searchQuery={searchQuery}
+                confidenceThreshold={confidenceThreshold}
               />
             </div>
           )}
@@ -332,8 +435,10 @@ export default function App() {
           {activeTab === 'linked' && (
             <div className="flex-1 min-h-0">
               <LinkedEntitiesPanel
-                linkedEntities={linkedEntities}
+                linkedEntities={filteredLinkedEntities}
+                totalLinkedBeforeFilter={linkedEntities.length}
                 onSelectEntity={handleSelectEntity}
+                documentCount={documents.length}
               />
             </div>
           )}

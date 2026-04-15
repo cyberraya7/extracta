@@ -108,6 +108,17 @@ export const ENTITY_LABELS: string[] = [
   'ic number',
 ];
 
+export interface ProcessStatus {
+  session_id: string;
+  status: 'processing' | 'finalizing' | 'completed' | 'error';
+  progress: number;
+  total: number;
+  current_file: string;
+  entity_count: number;
+  edge_count: number;
+  error?: string;
+}
+
 export interface AnalysisSession {
   id: string;
   name: string;

@@ -5,19 +5,47 @@ import re
 from app.services.ner_engine import ExtractedEntity
 
 _EMAIL_RE = re.compile(
-    r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+    r"\b"
+    r"(?![._%+\-])"                         # no leading special char
+    r"[A-Za-z0-9._%+\-]{1,64}"              # local part
+    r"(?<![._%+\-])"                        # no trailing special char
+    r"@"
+    r"(?:[A-Za-z0-9-]+\.)+"                 # domain labels
+    r"[A-Za-z]{2,24}"                       # TLD
+    r"\b"
 )
 
 _PHONE_RE = re.compile(
     r"(?<!\d)"
-    r"(?:\+?\d{1,3}[\s\-.]?)?"
-    r"(?:\(?\d{2,4}\)?[\s\-.]?)"
-    r"(?:\d[\d\s\-.]{4,}\d)"
+    r"(?:"
+        # Malaysia mobile
+        r"(?:\+?60|0)1[0-46-9][\s\-]?\d{3,4}[\s\-]?\d{3,4}"
+        r"|"
+        # Malaysia landline
+        r"(?:\+?60|0)[3-9][\s\-]?\d{3,4}[\s\-]?\d{3,4}"
+        r"|"
+        # International (structured)
+        r"\+?[1-9]\d{1,3}[\s\-]?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4}"
+        r"|"
+        # Loose fallback (OSINT / messy text)
+        r"\+?\d[\d\-\s()]{6,}\d"
+    r")"
     r"(?!\d)"
 )
 
 _MALAYSIA_IC_RE = re.compile(
-    r"\b(\d{6})-?(\d{2})-?(\d{4})\b"
+    r"\b"
+    r"(?:"
+        # YYMMDD (basic date validation)
+        r"(?:\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))"
+        r"-?"
+        # State code (01–16, 21–24, 71–72)
+        r"(?:0[1-9]|1[0-6]|2[1-4]|7[1-2])"
+        r"-?"
+        # Last 4 digits
+        r"\d{4}"
+    r")"
+    r"\b"
 )
 
 _PATTERNS: list[tuple[re.Pattern, str]] = [

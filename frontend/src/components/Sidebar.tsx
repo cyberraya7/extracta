@@ -16,8 +16,9 @@ interface SidebarProps {
   onLabelsChange: (labels: string[]) => void;
   confidenceThreshold: number;
   onConfidenceChange: (v: number) => void;
-  typeFilter: string | null;
-  onTypeFilterChange: (v: string | null) => void;
+  /** Selected entity types to show; empty = all types. */
+  typeFilters: string[];
+  onTypeFiltersChange: (v: string[]) => void;
   searchQuery: string;
   onSearchChange: (v: string) => void;
   hasResults: boolean;
@@ -33,8 +34,8 @@ export function Sidebar({
   onLabelsChange,
   confidenceThreshold,
   onConfidenceChange,
-  typeFilter,
-  onTypeFilterChange,
+  typeFilters,
+  onTypeFiltersChange,
   searchQuery,
   onSearchChange,
   hasResults,
@@ -49,6 +50,14 @@ export function Sidebar({
       onLabelsChange(labels.filter((l) => l !== label));
     } else {
       onLabelsChange([...labels, label]);
+    }
+  };
+
+  const toggleTypeFilter = (label: string) => {
+    if (typeFilters.includes(label)) {
+      onTypeFiltersChange(typeFilters.filter((l) => l !== label));
+    } else {
+      onTypeFiltersChange([...typeFilters, label]);
     }
   };
 
@@ -113,44 +122,48 @@ export function Sidebar({
           <Search className="w-3.5 h-3.5" />
           Filter
         </div>
+        <p className="text-[11px] text-slate-600 mb-2 leading-snug">
+          Applies to Dashboard, Graph, and Linked. Select one or more entity types, or All.
+        </p>
         <input
           type="text"
-          placeholder="Search entities..."
+          placeholder="Search entity text..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
         />
         <div className="flex flex-wrap gap-1.5 mt-3">
           <button
-            onClick={() => onTypeFilterChange(null)}
+            type="button"
+            onClick={() => onTypeFiltersChange([])}
             className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-              typeFilter === null
+              typeFilters.length === 0
                 ? 'bg-blue-600 text-white'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
             }`}
           >
             All
           </button>
-          {ENTITY_LABELS.map((label) => (
-            <button
-              key={label}
-              onClick={() =>
-                onTypeFilterChange(typeFilter === label ? null : label)
-              }
-              className={`px-2.5 py-1 rounded-full text-xs transition-colors capitalize ${
-                typeFilter === label
-                  ? 'text-white'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-              style={
-                typeFilter === label
-                  ? { backgroundColor: ENTITY_COLORS[label] }
-                  : undefined
-              }
-            >
-              {label}
-            </button>
-          ))}
+          {ENTITY_LABELS.map((label) => {
+            const active = typeFilters.includes(label);
+            return (
+              <button
+                type="button"
+                key={label}
+                onClick={() => toggleTypeFilter(label)}
+                className={`px-2.5 py-1 rounded-full text-xs transition-colors capitalize ${
+                  active
+                    ? 'text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+                style={
+                  active ? { backgroundColor: ENTITY_COLORS[label] } : undefined
+                }
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

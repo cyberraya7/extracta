@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { History, Trash2, ChevronRight, Users, GitGraph, FileText } from 'lucide-react';
-import { getSessions, deleteSession as apiDeleteSession } from '../services/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { History, Trash2, ChevronRight, Users, GitGraph, FileText, Pencil, Check, X } from 'lucide-react';
+import { getSessions, deleteSession as apiDeleteSession, renameSession as apiRenameSession } from '../services/api';
 import type { AnalysisSession } from '../types';
 
 interface HistoryPanelProps {
@@ -16,6 +16,9 @@ export function HistoryPanel({
 }: HistoryPanelProps) {
   const [sessions, setSessions] = useState<AnalysisSession[]>([]);
   const [expanded, setExpanded] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -30,6 +33,13 @@ export function HistoryPanel({
     fetchSessions();
   }, [fetchSessions, refreshKey]);
 
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
+
   const handleDelete = useCallback(
     async (e: React.MouseEvent, sessionId: string) => {
       e.stopPropagation();
@@ -42,6 +52,32 @@ export function HistoryPanel({
     },
     []
   );
+
+  const startRename = useCallback((e: React.MouseEvent, session: AnalysisSession) => {
+    e.stopPropagation();
+    setEditingId(session.id);
+    setEditName(session.name);
+  }, []);
+
+  const confirmRename = useCallback(async () => {
+    if (!editingId || !editName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await apiRenameSession(editingId, editName.trim());
+      setSessions((prev) =>
+        prev.map((s) => (s.id === editingId ? { ...s, name: editName.trim() } : s))
+      );
+    } catch {
+      /* ignore */
+    }
+    setEditingId(null);
+  }, [editingId, editName]);
+
+  const cancelRename = useCallback(() => {
+    setEditingId(null);
+  }, []);
 
   if (sessions.length === 0) return null;
 
@@ -73,10 +109,12 @@ export function HistoryPanel({
         <div className="space-y-1 max-h-64 overflow-y-auto">
           {sessions.map((session) => {
             const isCurrent = session.id === currentSessionId;
+            const isEditing = editingId === session.id;
+
             return (
               <div
                 key={session.id}
-                onClick={() => !isCurrent && onLoadSession(session.id)}
+                onClick={() => !isCurrent && !isEditing && onLoadSession(session.id)}
                 className={`rounded-lg px-3 py-2.5 transition-colors group ${
                   isCurrent
                     ? 'bg-blue-600/20 border border-blue-500/30 cursor-default'
@@ -85,14 +123,42 @@ export function HistoryPanel({
               >
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-xs font-medium truncate ${
-                        isCurrent ? 'text-blue-300' : 'text-slate-300'
-                      }`}
-                      title={session.name}
-                    >
-                      {session.name}
-                    </p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') confirmRename();
+                            if (e.key === 'Escape') cancelRename();
+                          }}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+                        />
+                        <button
+                          onClick={confirmRename}
+                          className="text-green-400 hover:text-green-300 shrink-0"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={cancelRename}
+                          className="text-slate-500 hover:text-slate-300 shrink-0"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p
+                        className={`text-xs font-medium truncate ${
+                          isCurrent ? 'text-blue-300' : 'text-slate-300'
+                        }`}
+                        title={session.name}
+                      >
+                        {session.name}
+                      </p>
+                    )}
                     <div className="flex items-center gap-3 mt-1 text-slate-500">
                       <span className="flex items-center gap-1 text-[10px]">
                         <FileText className="w-2.5 h-2.5" />
@@ -113,14 +179,25 @@ export function HistoryPanel({
                       </p>
                     )}
                   </div>
-                  {!isCurrent && (
-                    <button
-                      onClick={(e) => handleDelete(e, session.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all shrink-0 mt-0.5"
-                      title="Delete session"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                  {!isEditing && (
+                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                      <button
+                        onClick={(e) => startRename(e, session)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-all"
+                        title="Rename session"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      {!isCurrent && (
+                        <button
+                          onClick={(e) => handleDelete(e, session.id)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all"
+                          title="Delete session"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

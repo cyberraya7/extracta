@@ -1,8 +1,16 @@
-import { FileText, Trash2, Plus, Upload } from 'lucide-react';
+import { FileText, Trash2, Plus, Upload, FolderOpen } from 'lucide-react';
 import { useRef, useState, useCallback } from 'react';
 import type { UploadResult } from '../types';
 
 const ACCEPTED = '.pdf,.docx,.txt,.csv,.mp3,.wav,.m4a,.mp4,.webm,.mkv';
+const SUPPORTED_EXTS = new Set(['.pdf','.docx','.txt','.csv','.mp3','.wav','.m4a','.mp4','.webm','.mkv']);
+
+function filterSupported(files: FileList | File[]): File[] {
+  return Array.from(files).filter((f) => {
+    const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+    return SUPPORTED_EXTS.has(ext);
+  });
+}
 
 interface DocumentListProps {
   documents: UploadResult[];
@@ -17,12 +25,14 @@ export function DocumentList({
   onDeleteDocument,
   isProcessing,
 }: DocumentListProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handleFiles = useCallback(
     (fileList: FileList) => {
-      onAddFiles(Array.from(fileList));
+      const supported = filterSupported(fileList);
+      if (supported.length > 0) onAddFiles(supported);
     },
     [onAddFiles]
   );
@@ -45,21 +55,39 @@ export function DocumentList({
             Documents ({documents.length})
           </h3>
         </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={isProcessing}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Files
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+            Add Folder
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Files
+          </button>
+        </div>
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept={ACCEPTED}
           multiple
           className="hidden"
-          onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          className="hidden"
+          {...{ webkitdirectory: '', directory: '' } as any}
+          multiple
+          onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
         />
       </div>
 
@@ -73,7 +101,7 @@ export function DocumentList({
           onDrop={handleDrop}
         >
           <Upload className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-          <p className="text-sm text-slate-500">Drop files here or click Add Files</p>
+          <p className="text-sm text-slate-500">Drop files or folders here</p>
         </div>
       ) : (
         <div

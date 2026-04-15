@@ -29,7 +29,6 @@ export function TimelineView({ entities, onSelect }: TimelineViewProps) {
       </div>
       <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 py-3">
         <div className="flex items-center gap-3 min-w-max h-full">
-          <div className="h-px bg-slate-700 absolute left-0 right-0" />
           {sorted.map((ent) => (
             <button
               key={ent.id}

@@ -120,6 +120,15 @@ class MemoryStore:
         self.processed = True
         return True
 
+    def rename_session(self, session_id: str, name: str) -> bool:
+        with self._session() as s:
+            row = s.get(SessionModel, session_id)
+            if not row:
+                return False
+            row.name = name
+            s.commit()
+            return True
+
     def delete_session(self, session_id: str) -> bool:
         with self._session() as s:
             row = s.get(SessionModel, session_id)

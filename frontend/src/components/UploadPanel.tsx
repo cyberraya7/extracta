@@ -1,20 +1,31 @@
 import { useCallback, useState, useRef } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, FolderOpen, X } from 'lucide-react';
 
 interface UploadPanelProps {
   onUpload: (files: File[]) => void;
 }
 
 const ACCEPTED = '.pdf,.docx,.txt,.csv,.mp3,.wav,.m4a,.mp4,.webm,.mkv';
+const SUPPORTED_EXTS = new Set(['.pdf','.docx','.txt','.csv','.mp3','.wav','.m4a','.mp4','.webm','.mkv']);
+
+function filterSupported(files: FileList | File[]): File[] {
+  return Array.from(files).filter((f) => {
+    const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+    return SUPPORTED_EXTS.has(ext);
+  });
+}
 
 export function UploadPanel({ onUpload }: UploadPanelProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
-    const arr = Array.from(incoming);
-    setFiles((prev) => [...prev, ...arr]);
+    const supported = filterSupported(incoming);
+    if (supported.length > 0) {
+      setFiles((prev) => [...prev, ...supported]);
+    }
   }, []);
 
   const removeFile = useCallback((index: number) => {
@@ -39,7 +50,7 @@ export function UploadPanel({ onUpload }: UploadPanelProps) {
       <div className="text-center">
         <h2 className="text-3xl font-bold mb-2">Upload Documents</h2>
         <p className="text-slate-400">
-          Drag & drop documents, audio, or video files for intelligence analysis
+          Drag & drop files or folders for intelligence analysis
         </p>
       </div>
 
@@ -52,7 +63,7 @@ export function UploadPanel({ onUpload }: UploadPanelProps) {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => fileInputRef.current?.click()}
       >
         <Upload className="w-12 h-12 mx-auto mb-4 text-slate-500" />
         <p className="text-lg text-slate-300 mb-1">
@@ -60,14 +71,30 @@ export function UploadPanel({ onUpload }: UploadPanelProps) {
         </p>
         <p className="text-sm text-slate-500">PDF, DOCX, TXT, CSV, MP3, WAV, M4A, MP4, WEBM, MKV</p>
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept={ACCEPTED}
           multiple
           className="hidden"
-          onChange={(e) => e.target.files && addFiles(e.target.files)}
+          onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
         />
       </div>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }}
+        className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-sm font-medium transition-colors text-slate-300"
+      >
+        <FolderOpen className="w-4 h-4 text-amber-400" />
+        Upload Folder
+      </button>
+      <input
+        ref={folderInputRef}
+        type="file"
+        className="hidden"
+        {...{ webkitdirectory: '', directory: '' } as any}
+        multiple
+        onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
+      />
 
       {files.length > 0 && (
         <div className="w-full max-w-2xl space-y-2">

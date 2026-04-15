@@ -94,6 +94,10 @@ export async function loadSession(sessionId: string): Promise<SessionDetail> {
   return data.session;
 }
 
+export async function renameSession(sessionId: string, name: string): Promise<void> {
+  await client.patch(`/sessions/${sessionId}`, { name });
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   await client.delete(`/sessions/${sessionId}`);
 }

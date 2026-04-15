@@ -1,4 +1,4 @@
-# Yose — OSINT Intelligence Platform
+# Extracta — OSINT Intelligence Platform
 
 A production-ready web application for open-source intelligence analysis. Upload documents, extract named entities using GLiNER, visualize relationship graphs, and trace every link back to source evidence.
 

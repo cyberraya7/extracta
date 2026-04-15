@@ -1,0 +1,56 @@
+INTELLIGENCE REPORT — OPERATION CERULEAN WAVE
+Classification: UNCLASSIFIED // FOR TRAINING USE ONLY
+Date of Report: 15 March 2025
+
+EXECUTIVE SUMMARY
+
+On 12 January 2025, the Financial Intelligence Unit (FIU) of Europol flagged a series of suspicious wire transfers originating from Al-Rashid Trading Company, a Dubai-based shell corporation linked to Ali Hassan, a Lebanese-Canadian national. The transfers, totaling $4.7 million, were routed through Deutsche Bank in Frankfurt, Germany, before reaching Meridian Capital Holdings in the Cayman Islands.
+
+SECTION 1: KEY INDIVIDUALS
+
+Ali Hassan (also known as A. Hassan), born 3 July 1978 in Beirut, Lebanon, is the primary subject of this investigation. He currently resides in Toronto, Canada, and maintains business interests in Dubai, UAE, and Istanbul, Turkey. Hassan is believed to coordinate logistics through an encrypted Telegram group identified as "CeruleanOps."
+
+His primary associate, Fatima Al-Sayed, a Jordanian national based in Amman, Jordan, manages the Middle Eastern operations of the network. Al-Sayed was observed meeting with Viktor Petrov, a former Russian intelligence officer, at the Kempinski Hotel in Istanbul on 28 February 2025. Petrov currently operates as a private military consultant through his firm, Aegis Security Solutions, registered in Nicosia, Cyprus.
+
+SECTION 2: FINANCIAL TRAIL
+
+Between October 2024 and February 2025, the following financial movements were detected:
+
+On 15 October 2024, Al-Rashid Trading Company transferred $1.2 million to a numbered account at Credit Suisse in Zurich, Switzerland. The funds were subsequently moved to Meridian Capital Holdings on 2 November 2024.
+
+A second transfer of $2.5 million was initiated on 5 December 2024 from Dubai Islamic Bank to Deutsche Bank, with the stated purpose of "consulting services." This amount was split across three accounts controlled by Fatima Al-Sayed in Amman.
+
+The final transfer of $1 million occurred on 12 January 2025, directly from Ali Hassan's personal account at HSBC London to an account at Bank of Cyprus linked to Aegis Security Solutions.
+
+SECTION 3: COMMUNICATION ANALYSIS
+
+Intercepted communications reveal that the network primarily uses Telegram and WhatsApp for operational coordination. A Signal channel was also identified for communication between Viktor Petrov and an unknown individual using the handle "Nightingale."
+
+On 20 January 2025, a WhatsApp message from Ali Hassan to Fatima Al-Sayed referenced a meeting scheduled for 15 February 2025 in Beirut. The message stated: "Confirm the Beirut package with our friends. Budget approved: €500,000."
+
+SECTION 4: ORGANIZATIONAL LINKS
+
+The investigation has uncovered connections to the following organizations:
+- Al-Rashid Trading Company (Dubai, UAE) — Front company for financial operations
+- Meridian Capital Holdings (Cayman Islands) — Offshore investment vehicle
+- Aegis Security Solutions (Nicosia, Cyprus) — Private military and consulting firm
+- Crescent Logistics Ltd (Istanbul, Turkey) — Suspected transport and shipping front
+
+Marcus Chen, a Hong Kong-based financial advisor employed by Pacific Rim Investments, was identified as the architect of the offshore financial structure. Chen met with Ali Hassan in Singapore on 7 November 2024 to discuss the establishment of additional shell companies in the British Virgin Islands.
+
+SECTION 5: TIMELINE OF KEY EVENTS
+
+- 15 October 2024: First wire transfer from Al-Rashid Trading Company
+- 2 November 2024: Funds arrive at Meridian Capital Holdings
+- 7 November 2024: Hassan meets Marcus Chen in Singapore
+- 5 December 2024: Second major transfer through Deutsche Bank
+- 12 January 2025: FIU flags suspicious transactions
+- 20 January 2025: Intercepted WhatsApp communication
+- 28 February 2025: Observed meeting at Kempinski Hotel, Istanbul
+- 15 March 2025: Date of this report
+
+ASSESSMENT
+
+This network represents a sophisticated, multi-jurisdictional financial operation with potential links to money laundering and illicit arms procurement. The involvement of Viktor Petrov and Aegis Security Solutions suggests a possible nexus between financial crime and private military operations. Continued monitoring of all Telegram and WhatsApp channels associated with the network is recommended.
+
+END OF REPORT

@@ -5,6 +5,9 @@ interface ProcessingStatusProps {
   progress: number;
   total: number;
   currentFile: string;
+  warnings: string[];
+  documentsWithNoText: number;
+  documentsSkippedForExtraction: number;
 }
 
 const STAGE_CONFIG = {
@@ -28,7 +31,15 @@ const STAGE_CONFIG = {
   },
 };
 
-export function ProcessingStatus({ stage, progress, total, currentFile }: ProcessingStatusProps) {
+export function ProcessingStatus({
+  stage,
+  progress,
+  total,
+  currentFile,
+  warnings,
+  documentsWithNoText,
+  documentsSkippedForExtraction,
+}: ProcessingStatusProps) {
   const config = STAGE_CONFIG[stage];
   const Icon = config.icon;
   const pct = total > 0 ? Math.round((progress / total) * 100) : 0;
@@ -61,6 +72,16 @@ export function ProcessingStatus({ stage, progress, total, currentFile }: Proces
         {currentFile && (
           <p className="text-xs text-slate-500 truncate text-center" title={currentFile}>
             {currentFile}
+          </p>
+        )}
+        {(documentsWithNoText > 0 || documentsSkippedForExtraction > 0) && (
+          <p className="text-xs text-amber-400 text-center">
+            {documentsWithNoText} file(s) with no text, {documentsSkippedForExtraction} extraction issue(s)
+          </p>
+        )}
+        {warnings.length > 0 && (
+          <p className="text-xs text-amber-300 text-center truncate" title={warnings[0]}>
+            {warnings[0]}
           </p>
         )}
       </div>

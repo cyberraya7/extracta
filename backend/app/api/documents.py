@@ -17,6 +17,10 @@ async def list_documents():
             filename=d.filename,
             size=d.size,
             text_length=len(d.text),
+            extraction_status=d.extraction_status,
+            extraction_message=d.extraction_message,
+            extractor_used=d.extractor_used,
+            exif_metadata=d.exif_metadata,
         )
         for d in docs
     ]

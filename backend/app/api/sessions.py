@@ -1,7 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.models.schemas import SessionOut, SessionDetail
+from app.models.schemas import (
+    BulkSessionDeleteOut,
+    BulkSessionDeleteRequest,
+    SessionOut,
+    SessionDetail,
+)
 from app.store.memory_store import store
 
 router = APIRouter()
@@ -44,3 +49,9 @@ async def delete_session(session_id: str):
     if not store.delete_session(session_id):
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "deleted", "session_id": session_id}
+
+
+@router.post("/sessions/delete-bulk", response_model=BulkSessionDeleteOut)
+async def delete_sessions_bulk(body: BulkSessionDeleteRequest):
+    deleted_ids, not_found_ids = store.delete_sessions_bulk(body.session_ids)
+    return BulkSessionDeleteOut(deleted_ids=deleted_ids, not_found_ids=not_found_ids)

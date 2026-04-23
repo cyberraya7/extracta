@@ -12,3 +12,12 @@ sqlalchemy>=2.0
 psycopg2-binary>=2.9.9
 openai-whisper>=20231117
 # System requirement: ffmpeg must be installed (brew install ffmpeg)
+numpy>=1.26
+Pillow>=10.0
+PyMuPDF>=1.24
+paddleocr>=2.8.1; python_version < "3.13"
+paddlepaddle>=2.6.1; python_version < "3.13"
+insightface>=0.7.3
+onnxruntime>=1.18.0
+python-dotenv>=1.0.1
+mutagen>=1.47.0

@@ -15,10 +15,16 @@ DEFAULT_LABELS = [
     "location",
     "date",
     "money",
+    # Messaging apps (WhatsApp, Telegram, Signal, etc.)
     "communication platform",
+    "social media platform",
+    "username",
     "email",
     "phone",
     "ic number",
+    "ip address",
+    "port number",
+    "asn number",
 ]
 
 MAX_CHUNK_LENGTH = 1500

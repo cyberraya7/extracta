@@ -5,8 +5,8 @@ interface UploadPanelProps {
   onUpload: (files: File[]) => void;
 }
 
-const ACCEPTED = '.pdf,.docx,.txt,.csv,.mp3,.wav,.m4a,.mp4,.webm,.mkv';
-const SUPPORTED_EXTS = new Set(['.pdf','.docx','.txt','.csv','.mp3','.wav','.m4a','.mp4','.webm','.mkv']);
+const ACCEPTED = '.pdf,.docx,.txt,.csv,.jpg,.jpeg,.png,.mp3,.wav,.m4a,.mp4,.webm,.mkv';
+const SUPPORTED_EXTS = new Set(['.pdf','.docx','.txt','.csv','.jpg','.jpeg','.png','.mp3','.wav','.m4a','.mp4','.webm','.mkv']);
 
 function filterSupported(files: FileList | File[]): File[] {
   return Array.from(files).filter((f) => {
@@ -69,7 +69,7 @@ export function UploadPanel({ onUpload }: UploadPanelProps) {
         <p className="text-lg text-slate-300 mb-1">
           Drop files here or click to browse
         </p>
-        <p className="text-sm text-slate-500">PDF, DOCX, TXT, CSV, MP3, WAV, M4A, MP4, WEBM, MKV</p>
+        <p className="text-sm text-slate-500">PDF, DOCX, TXT, CSV, JPG, JPEG, PNG, MP3, WAV, M4A, MP4, WEBM, MKV</p>
         <input
           ref={fileInputRef}
           type="file"

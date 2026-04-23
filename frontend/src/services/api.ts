@@ -7,9 +7,14 @@ import type {
   Entity,
   GraphData,
   EvidenceResult,
+  InvestigationResult,
+  InvestigationRunRequest,
   LinkedEntity,
+  FaceInstance,
+  FaceCluster,
   AnalysisSession,
   SessionDetail,
+  BulkSessionDeleteResponse,
 } from '../types';
 
 const client = axios.create({
@@ -17,11 +22,34 @@ const client = axios.create({
   timeout: 120_000,
 });
 
+function toUserError(err: any, fallback: string): Error {
+  const code = err?.code as string | undefined;
+  const detail = err?.response?.data?.detail as string | undefined;
+  if (detail) return new Error(detail);
+  if (code === 'ECONNABORTED') {
+    return new Error(
+      'Upload timed out. Large audio/video transcription can take longer; please retry or increase timeout.',
+    );
+  }
+  if (!err?.response) {
+    return new Error(
+      'Connection lost during upload. The backend may have restarted while processing media files.',
+    );
+  }
+  return new Error(err?.message || fallback);
+}
+
 export async function uploadFiles(files: File[]): Promise<UploadResult[]> {
   const form = new FormData();
   files.forEach((f) => form.append('files', f));
-  const { data } = await client.post<UploadResult[]>('/upload', form);
-  return data;
+  try {
+    const { data } = await client.post<UploadResult[]>('/upload', form, {
+      timeout: 30 * 60_000,
+    });
+    return data;
+  } catch (err: any) {
+    throw toUserError(err, 'Upload failed');
+  }
 }
 
 const BATCH_SIZE = 10;
@@ -78,6 +106,27 @@ export async function getEntityEvidence(
   return data;
 }
 
+export async function getEntityInvestigation(
+  entityId: string,
+  variant?: string
+): Promise<InvestigationResult> {
+  const { data } = await client.get<InvestigationResult>(`/entities/${entityId}/investigation`, {
+    params: variant ? { variant } : {},
+  });
+  return data;
+}
+
+export async function runEntityInvestigation(
+  entityId: string,
+  body?: InvestigationRunRequest
+): Promise<InvestigationResult> {
+  const { data } = await client.post<InvestigationResult>(
+    `/entities/${entityId}/investigation/run`,
+    body ?? { source: 'tools' }
+  );
+  return data;
+}
+
 export async function getEdgeEvidence(
   source: string,
   target: string
@@ -91,6 +140,30 @@ export async function getEdgeEvidence(
 export async function getLinkedEntities(): Promise<LinkedEntity[]> {
   const { data } = await client.get<LinkedEntity[]>('/entities/linked');
   return data;
+}
+
+export async function getFaces(): Promise<FaceInstance[]> {
+  const { data } = await client.get<FaceInstance[]>('/faces');
+  return data;
+}
+
+export async function getSimilarFaces(faceId: string): Promise<FaceInstance[]> {
+  const { data } = await client.get<FaceInstance[]>(`/faces/${faceId}/similar`);
+  return data;
+}
+
+export async function getLinkedFaces(): Promise<FaceCluster[]> {
+  const { data } = await client.get<FaceCluster[]>('/faces/linked');
+  return data;
+}
+
+export async function updateFaceClusterName(
+  clusterId: string,
+  displayName: string,
+): Promise<void> {
+  await client.patch(`/faces/linked/${encodeURIComponent(clusterId)}/name`, {
+    display_name: displayName,
+  });
 }
 
 export async function listDocuments(): Promise<UploadResult[]> {
@@ -125,6 +198,13 @@ export async function renameSession(sessionId: string, name: string): Promise<vo
 
 export async function deleteSession(sessionId: string): Promise<void> {
   await client.delete(`/sessions/${sessionId}`);
+}
+
+export async function deleteSessionsBulk(sessionIds: string[]): Promise<BulkSessionDeleteResponse> {
+  const { data } = await client.post<BulkSessionDeleteResponse>('/sessions/delete-bulk', {
+    session_ids: sessionIds,
+  });
+  return data;
 }
 
 export function getExportUrl(format: 'json' | 'csv'): string {

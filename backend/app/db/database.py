@@ -29,6 +29,11 @@ def _migrate_add_columns() -> None:
         ("entity_occurrences", "session_id", "VARCHAR(36)"),
         ("relationships", "session_id", "VARCHAR(36)"),
         ("evidence_snippets", "session_id", "VARCHAR(36)"),
+        ("evidence_snippets", "highlight_ranges", "JSON"),
+        ("documents", "extraction_status", "VARCHAR(64)"),
+        ("documents", "extraction_message", "TEXT"),
+        ("documents", "extractor_used", "VARCHAR(128)"),
+        ("documents", "exif_metadata", "JSON"),
     ]
     with engine.begin() as conn:
         for table, column, col_type in migrations:
@@ -49,6 +54,8 @@ def create_all() -> None:
         EntityOccurrenceModel,
         RelationshipModel,
         EvidenceSnippetModel,
+        FaceInstanceModel,
+        FaceClusterLabelModel,
     )
     Base.metadata.create_all(bind=engine)
     _migrate_add_columns()

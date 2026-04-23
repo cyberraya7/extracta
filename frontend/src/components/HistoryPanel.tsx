@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { History, Trash2, ChevronRight, Users, GitGraph, FileText, Pencil, Check, X } from 'lucide-react';
-import { getSessions, deleteSession as apiDeleteSession, renameSession as apiRenameSession } from '../services/api';
+import {
+  getSessions,
+  deleteSession as apiDeleteSession,
+  deleteSessionsBulk as apiDeleteSessionsBulk,
+  renameSession as apiRenameSession,
+} from '../services/api';
 import type { AnalysisSession } from '../types';
 
 interface HistoryPanelProps {
@@ -18,6 +23,7 @@ export function HistoryPanel({
   const [expanded, setExpanded] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSessions = useCallback(async () => {
@@ -40,12 +46,17 @@ export function HistoryPanel({
     }
   }, [editingId]);
 
+  useEffect(() => {
+    setSelectedSessionIds((prev) => prev.filter((id) => sessions.some((s) => s.id === id)));
+  }, [sessions]);
+
   const handleDelete = useCallback(
     async (e: React.MouseEvent, sessionId: string) => {
       e.stopPropagation();
       try {
         await apiDeleteSession(sessionId);
         setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        setSelectedSessionIds((prev) => prev.filter((id) => id !== sessionId));
       } catch {
         /* ignore */
       }
@@ -79,6 +90,40 @@ export function HistoryPanel({
     setEditingId(null);
   }, []);
 
+  const toggleSessionSelection = useCallback((sessionId: string) => {
+    setSelectedSessionIds((prev) =>
+      prev.includes(sessionId)
+        ? prev.filter((id) => id !== sessionId)
+        : [...prev, sessionId]
+    );
+  }, []);
+
+  const deletableSessions = sessions.filter((s) => s.id !== currentSessionId);
+  const allDeletableSelected =
+    deletableSessions.length > 0 &&
+    selectedSessionIds.length === deletableSessions.length;
+
+  const toggleSelectAll = useCallback(() => {
+    if (allDeletableSelected) {
+      setSelectedSessionIds([]);
+      return;
+    }
+    setSelectedSessionIds(deletableSessions.map((s) => s.id));
+  }, [allDeletableSelected, deletableSessions]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedSessionIds.length === 0) return;
+    try {
+      const result = await apiDeleteSessionsBulk(selectedSessionIds);
+      if (result.deleted_ids.length > 0) {
+        setSessions((prev) => prev.filter((s) => !result.deleted_ids.includes(s.id)));
+      }
+      setSelectedSessionIds([]);
+    } catch {
+      /* ignore */
+    }
+  }, [selectedSessionIds]);
+
   if (sessions.length === 0) return null;
 
   const formatDate = (iso: string | null) => {
@@ -106,10 +151,34 @@ export function HistoryPanel({
       </button>
 
       {expanded && (
-        <div className="space-y-1 max-h-64 overflow-y-auto">
+        <div className="space-y-2">
+          {deletableSessions.length > 0 && (
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-[11px] text-slate-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allDeletableSelected}
+                  onChange={toggleSelectAll}
+                  className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                />
+                Select all
+              </label>
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={selectedSessionIds.length === 0}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-red-900/30 text-red-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-900/50 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete selected
+              </button>
+            </div>
+          )}
+          <div className="space-y-1 max-h-64 overflow-y-auto">
           {sessions.map((session) => {
             const isCurrent = session.id === currentSessionId;
             const isEditing = editingId === session.id;
+            const isSelected = selectedSessionIds.includes(session.id);
 
             return (
               <div
@@ -118,10 +187,25 @@ export function HistoryPanel({
                 className={`rounded-lg px-3 py-2.5 transition-colors group ${
                   isCurrent
                     ? 'bg-blue-600/20 border border-blue-500/30 cursor-default'
+                    : isSelected
+                      ? 'bg-slate-800 border border-blue-500/40 cursor-pointer'
                     : 'bg-slate-800/50 hover:bg-slate-800 cursor-pointer border border-transparent'
                 }`}
               >
                 <div className="flex items-start gap-2">
+                  {!isCurrent && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSessionSelection(session.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                      aria-label={`Select session ${session.name}`}
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     {isEditing ? (
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -203,6 +287,7 @@ export function HistoryPanel({
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>

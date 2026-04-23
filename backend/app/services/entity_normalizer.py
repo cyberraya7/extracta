@@ -15,6 +15,25 @@ _CURRENCY_RE = re.compile(
     r"[\$€£¥]\s?[\d,]+(?:\.\d+)?(?:\s?(?:million|billion|thousand|[MBKmk]))?",
 )
 
+_IPV4_STRICT = re.compile(
+    r"^(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})){3}$"
+)
+
+
+def _canonicalize_defanged_ipv4(text: str) -> str:
+    """Normalize defanged dotted IPs: 89.117.79[.]31 → 89.117.79.31"""
+    t = text.strip()
+    t = re.sub(r"\[\.\]", ".", t)
+    return t
+
+
+def _looks_like_ipv4_any(text: str) -> bool:
+    """Plain or defanged IPv4 (common in IOC copy-paste)."""
+    t = text.strip()
+    if _IPV4_STRICT.match(t):
+        return True
+    return bool(_IPV4_STRICT.match(_canonicalize_defanged_ipv4(t)))
+
 
 def _digit_run_length(text: str) -> int:
     return len(re.sub(r"\D", "", text))
@@ -27,6 +46,12 @@ def _looks_like_phone_text(text: str) -> bool:
 
 def _sanitize_entity_label(ent: ExtractedEntity) -> ExtractedEntity:
     """GLiNER often mislabels bare phone strings as *email*; fix before grouping."""
+    t = ent.text.strip()
+    if _IPV4_STRICT.match(t):
+        return replace(ent, label="ip address")
+    # Defanged IPs (89.117.79[.]31) are not matched by GLiNER/regex IPv4; model may guess "port number".
+    if _looks_like_ipv4_any(t):
+        return replace(ent, label="ip address")
     if ent.label.lower() != "email":
         return ent
     if "@" in ent.text:
@@ -55,6 +80,17 @@ def _resolve_label_merge(text: str, label_a: str, label_b: str) -> str:
             return label_a if a == "email" else label_b
         if _digit_run_length(text) >= 10 and "-" in text.replace(" ", ""):
             return label_a if a == "ic number" else label_b
+
+    if "ip address" in pair:
+        if _IPV4_STRICT.match(text.strip()):
+            return label_a if a == "ip address" else label_b
+        if _looks_like_ipv4_any(text.strip()):
+            return label_a if a == "ip address" else label_b
+
+    if pair == {"ip address", "port number"}:
+        if _looks_like_ipv4_any(text.strip()):
+            return label_a if a == "ip address" else label_b
+        return label_a if a == "port number" else label_b
 
     return label_a
 

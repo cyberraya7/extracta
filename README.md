@@ -130,7 +130,7 @@ Combined text from all documents in the run is used when building the graph so c
 | Component | `react-force-graph-2d` | Canvas-based 2D force-directed graph. |
 | Custom drawing | Canvas `nodeCanvasObject` / `linkCanvasObject` | Node shapes, colors, labels; edge styling and optional relationship labels at high zoom. |
 
-The graph tab includes **filters**: search by entity text (value), toggle visibility by **entity type**, a shape legend, and stronger spacing parameters for readability.
+The graph tab uses the **same left-sidebar filters** as dashboard/linked (confidence, entity type, and search value), plus an in-canvas shape legend for readability.
 
 ---
 
@@ -138,7 +138,7 @@ The graph tab includes **filters**: search by entity text (value), toggle visibi
 
 ### Document ingestion
 
-- **Formats** — PDF, DOCX, TXT, CSV; audio/video (MP3, WAV, M4A, MP4, WEBM, MKV) via **OpenAI Whisper** (local; requires `ffmpeg`).
+- **Formats** — PDF, DOCX, TXT, CSV, JPG/JPEG/PNG; audio/video (MP3, WAV, M4A, MP4, WEBM, MKV) via **OpenAI Whisper** (local; requires `ffmpeg`).
 - **Single and multi-file** upload; **folder** upload (webkit directory) with extension filtering.
 - **Batched uploads** for large folders to reduce timeouts.
 - **Document list** in results with index, size, **add files/folder**, and **delete** (removes file and DB row; re-runs analysis on remaining docs).
@@ -153,14 +153,15 @@ The graph tab includes **filters**: search by entity text (value), toggle visibi
 - **Dashboard** — Sortable/filterable entity table; confidence and type filters; search.
 - **Graph (full tab)** — Interactive force-directed graph; node click (evidence), edge click (pair evidence); type + value filters; distinct shapes per type.
 - **Linked** — Entities that appear in **two or more documents** in the same session (cross-document linking).
+- **Faces** — Face clustering across document images (PDF embedded images, DOCX media, image uploads), with a linked-face tab for clusters spanning 2+ documents.
 - **Timeline** — Date-type entities on a horizontal timeline (chronological sort).
-- **Evidence panel** — Snippets with document names for selected entity or edge.
+- **Evidence panel** — Snippets with document names and precise span-based mention highlighting for selected entity/edge.
 
 ### Sessions and history
 
 - Each process run creates a **session** stored in the database.
 - **History** sidebar: list sessions, load previous analysis, **rename** session, delete session.
-- **New analysis** clears the current UI workflow but keeps prior sessions in the DB.
+- **Ingest New Session** (sidebar) clears the current UI workflow but keeps prior sessions in the DB.
 
 ### Data and export
 
@@ -211,6 +212,8 @@ Default dev ports:
 - Python 3.10+
 - Node.js 18+
 - For media: `ffmpeg` on the system path (e.g. `brew install ffmpeg`)
+- For OCR on scanned PDFs/images: PaddleOCR runtime (`paddleocr`, `paddlepaddle`) and `PyMuPDF` (Paddle wheels are typically available on Python <= 3.12)
+- For face recognition: `insightface` + `onnxruntime` (CPU mode is supported)
 
 ### Backend
 
@@ -219,10 +222,30 @@ cd backend
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python run.py # http://localhost:8001
+python run.py # http://localhost:8001 (set UVICORN_RELOAD=1 to enable auto-reload)
 ```
 
 The first run downloads the GLiNER model (on the order of hundreds of MB depending on cache). Subsequent starts are faster.
+
+Optional backend env vars:
+
+- `UVICORN_RELOAD=1` — enable autoreload in dev (default off to avoid media upload restarts).
+- `EXTRACTA_UPLOAD_DIR=/absolute/path` — store uploads outside repo/watch tree (files are organized under `YYYY/MM/DD` subfolders).
+- `EXTRACTA_ENABLE_PDF_OCR=1` — enable OCR fallback for low-text PDF pages (default on).
+- `EXTRACTA_OSINT_EMAIL_SITES_CMD="..."` — Holehe / registered-sites wrapper for email (`{value}` placeholder).
+- `EXTRACTA_OSINT_EMAIL_CMD="..."` — legacy fallback if `EMAIL_SITES_CMD` is unset (`{value}` placeholder).
+- `EXTRACTA_OSINT_PHONE_CMD="..."` — command template for phone investigation (`{value}` placeholder). Default wrapper uses `telegram-phone-number-checker`.
+- `EXTRACTA_OSINT_USERNAME_CMD="..."` — command template for username investigation (`{value}` placeholder). Default wrapper emits websites-only output.
+- `EXTRACTA_MAIGRET_CMD="maigret \"{value}\" --json simple"` — command used by `backend/username_lookup.py` to call Maigret internally.
+- `EXTRACTA_OSINT_ORG_CMD="..."` — command template for organization investigation (`{value}` placeholder).
+- `EXTRACTA_OSINT_MAX_ENTITIES=100` — upper bound on entities investigated per run.
+- `EXTRACTA_INSTAGRAM_LEAK_PATH=/path/to/file.ndjson` — optional path to the NDJSON Instagram leak file for **Investigation → Leak database** (defaults to `backend/Instagram-leak.json` relative to the backend package root).
+
+Username investigation setup notes:
+
+- Install Maigret from [soxoj/maigret](https://github.com/soxoj/maigret).
+- Ensure the executable is available on your `PATH`, or set `EXTRACTA_MAIGRET_CMD` to the full command template.
+- The UI investigation panel displays only matched websites in a clean numbered list for username entities.
 
 ### Frontend
 
@@ -240,6 +263,22 @@ Set `DATABASE_URL` before starting the backend, for example:
 export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/extracta
 ```
 
+### Troubleshooting extraction (WAV/MP4 and scanned PDFs)
+
+If processing completes with no entities, verify optional runtimes:
+
+```bash
+ffmpeg -version
+python -c "import whisper; print('whisper ok')"
+python -c "import paddleocr, fitz; print('ocr ok')"
+```
+
+Notes:
+
+- WAV/MP4 transcription requires `ffmpeg` + Whisper dependencies.
+- Scanned/image PDFs require OCR runtime; if unavailable, upload succeeds but extraction warnings are returned.
+- Use Python 3.10-3.12 for best compatibility with Paddle wheels.
+
 ---
 
 ## Usage
@@ -247,9 +286,9 @@ export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/extracta
 1. Open `http://localhost:5173`.
 2. Upload files or an entire folder (supported extensions only).
 3. Wait for upload and processing (progress is shown for large batches).
-4. Explore **Dashboard** (table, timeline), **Graph** (filters, shapes, zoom), and **Linked** (cross-document entities).
-5. Click entities or edges to open **Evidence**.
-6. Use **History** to reload or rename past sessions; **New analysis** starts a fresh upload flow without deleting old sessions.
+4. Explore **Dashboard**, **Graph**, **Mindmap**, **Linked**, **Metadata**, and **Faces** tabs.
+5. Click entities or edges to open **Evidence** and optional investigation findings.
+6. Use **History** to reload or rename past sessions; **Ingest New Session** starts a fresh upload flow without deleting old sessions.
 7. Export **JSON** or **CSV** when needed.
 
 Sample text: `backend/test_data/sample_report.txt`
@@ -264,7 +303,12 @@ Sample text: `backend/test_data/sample_report.txt`
 | POST | `/api/process` | Starts analysis (async); returns `session_id`, `status: processing` |
 | GET | `/api/process/status/{session_id}` | Processing progress and completion status |
 | GET | `/api/entities` | List entities (`?type=`, `?min_confidence=`, `?search=`) |
+| GET | `/api/entities/{entity_id}/investigation` | Generic background investigation findings for an entity |
 | GET | `/api/entities/linked` | Entities appearing in 2+ documents (current session) |
+| GET | `/api/faces` | List detected faces in the current session |
+| GET | `/api/faces/{face_id}/similar` | Faces in the same similarity cluster |
+| GET | `/api/faces/linked` | Face clusters that span 2+ documents |
+| GET | `/api/faces/thumbnail/{face_id}` | Thumbnail image for a detected face |
 | GET | `/api/graph` | Graph nodes and edges (`?type=` filter) |
 | GET | `/api/evidence/{entity_id}` | Evidence snippets for an entity |
 | GET | `/api/evidence/edge/{source}/{target}` | Evidence for an entity pair |
@@ -289,7 +333,8 @@ Sample text: `backend/test_data/sample_report.txt`
 | **NER** | GLiNER, PyTorch |
 | **Graph (server)** | NetworkX |
 | **Database** | SQLAlchemy 2, SQLite (default), psycopg2 (PostgreSQL optional) |
-| **Documents** | pdfplumber, python-docx, CSV; Whisper + ffmpeg for A/V |
+| **Documents** | pdfplumber, python-docx, CSV, PaddleOCR + PyMuPDF fallback OCR, Whisper + ffmpeg for A/V |
+| **Face recognition** | insightface, onnxruntime, Pillow, NumPy |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS 4 |
 | **Graph (client)** | react-force-graph-2d, d3-force |
 | **UI** | Lucide icons, Axios |

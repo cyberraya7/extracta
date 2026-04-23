@@ -23,9 +23,14 @@ const ENTITY_SHAPES: Record<string, ShapeType> = {
   date: 'square',
   money: 'hexagon',
   'communication platform': 'pentagon',
+  'social media platform': 'star',
+  username: 'diamond',
   email: 'star',
   phone: 'cross',
   'ic number': 'octagon',
+  'ip address': 'square',
+  'port number': 'hexagon',
+  'asn number': 'triangle',
 };
 
 function drawShape(

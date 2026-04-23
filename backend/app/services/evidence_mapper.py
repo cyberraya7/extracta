@@ -49,19 +49,30 @@ def _snippets_for_entity(
     """Extract text snippets where an entity appears."""
     snippets: list[dict] = []
     seen_sentences: set[str] = set()
+    entity_text = str(entity.get("text", ""))
 
     for pos in entity["positions"]:
-        sentence = _find_containing_sentence(
-            pos["start"], pos["end"], sentence_spans
+        start = int(pos["start"])
+        end = int(pos["end"])
+        if start < 0 or end <= start or end > len(text):
+            continue
+        # Strict exact match guard: only show snippets for exact text spans.
+        if text[start:end] != entity_text:
+            continue
+        sentence, s_start, _s_end = _find_containing_sentence(
+            start, end, sentence_spans
         )
         if sentence and sentence not in seen_sentences:
             seen_sentences.add(sentence)
+            hl_start = max(0, start - s_start)
+            hl_end = min(len(sentence), end - s_start)
             snippets.append(
                 {
                     "text": sentence,
-                    "entity_text": entity["text"],
-                    "start": pos["start"],
-                    "end": pos["end"],
+                    "entity_text": entity_text,
+                    "highlight_ranges": [{"start": hl_start, "end": hl_end}],
+                    "start": start,
+                    "end": end,
                     "document_id": doc_id,
                     "document_name": doc_name,
                 }
@@ -69,15 +80,27 @@ def _snippets_for_entity(
 
     if not snippets:
         for pos in entity["positions"]:
-            ctx_start = max(0, pos["start"] - CONTEXT_CHARS)
-            ctx_end = min(len(text), pos["end"] + CONTEXT_CHARS)
+            start = int(pos["start"])
+            end = int(pos["end"])
+            if start < 0 or end <= start or end > len(text):
+                continue
+            if text[start:end] != entity_text:
+                continue
+            ctx_start = max(0, start - CONTEXT_CHARS)
+            ctx_end = min(len(text), end + CONTEXT_CHARS)
             snippet = text[ctx_start:ctx_end].strip()
             snippets.append(
                 {
                     "text": f"...{snippet}...",
-                    "entity_text": entity["text"],
-                    "start": pos["start"],
-                    "end": pos["end"],
+                    "entity_text": entity_text,
+                    "highlight_ranges": [
+                        {
+                            "start": 3 + (start - ctx_start),
+                            "end": 3 + (end - ctx_start),
+                        }
+                    ],
+                    "start": start,
+                    "end": end,
                     "document_id": doc_id,
                     "document_name": doc_name,
                 }
@@ -117,6 +140,9 @@ def _build_edge_evidence(
                     {
                         "text": sentence,
                         "entities": [a["text"], b["text"]],
+                        "highlight_ranges": _edge_highlight_ranges(
+                            a, b, s_start, s_end, len(sentence)
+                        ),
                         "document_id": doc_id,
                         "document_name": doc_name,
                     }
@@ -125,11 +151,32 @@ def _build_edge_evidence(
 
 def _find_containing_sentence(
     start: int, end: int, sentence_spans: list[tuple[int, int, str]]
-) -> str | None:
+) -> tuple[str | None, int, int]:
     for s_start, s_end, sentence in sentence_spans:
         if start >= s_start and end <= s_end:
-            return sentence
-    return None
+            return sentence, s_start, s_end
+    return None, 0, 0
+
+
+def _edge_highlight_ranges(
+    ent_a: dict,
+    ent_b: dict,
+    sentence_start: int,
+    sentence_end: int,
+    sentence_len: int,
+) -> list[dict]:
+    ranges: list[dict] = []
+    for ent in (ent_a, ent_b):
+        for pos in ent["positions"]:
+            if pos["start"] >= sentence_start and pos["end"] <= sentence_end:
+                ranges.append(
+                    {
+                        "start": max(0, pos["start"] - sentence_start),
+                        "end": min(sentence_len, pos["end"] - sentence_start),
+                    }
+                )
+                break
+    return ranges
 
 
 def _edge_key(a: str, b: str) -> str:
